@@ -20,7 +20,7 @@ class Storage:
     """
     
     def list(self):
-        return ['Healthcare.pdf', 'Education.pdf']
+        return ['Healthcare.pdf', 'Education.pdf', 'Manual.pdf']
 
     def get(self, name):
         try:
@@ -140,7 +140,7 @@ def displayPDF(file):
     st.markdown(pdf_display, unsafe_allow_html=True)
 
 ###### Get Question List Function ######
-def get_question_list(uploaded_file_name):
+def get_question_list(uploaded_file_name, selected_model):
     
     """
     Extracts a list of questions from a CSV file that match the given document name.
@@ -161,14 +161,17 @@ def get_question_list(uploaded_file_name):
     """
     try:
         df = pd.read_csv("question_list.csv")
-        file_name = os.path.basename(uploaded_file_name) 
-        filtered_df = df[df['Document Name'] == file_name]
-        return filtered_df["Question"].tolist()
+        df.head()
+        file_name = os.path.basename(uploaded_file_name)
+        # Filter based on both document name and model name
+        filtered_df = df[(df['Document Name'] == file_name) & (df['Model Name'] == selected_model)]
+        return filtered_df.to_dict('records')
     except Exception as e:
         print(f"Error reading CSV: {e}")
         return []
-    
-    
+
+
+
 ###### Get Highlighted Image Function ######
 def get_highlighted_image(pdf_path, search_sentence, answer):
     """
@@ -188,35 +191,37 @@ def get_highlighted_image(pdf_path, search_sentence, answer):
         list: A list of tuples, each containing an image object of the highlighted area and the page 
               number where the highlight was made.
     """
-    
     pdf_document = fitz.open(pdf_path)
     images = []
-    proximity_threshold = 5 
-    
-    ## Loop through each page in the PDF document ##
+    vertical_padding = 75  # Padding around the highlighted area
+    proximity_threshold = 50  # Threshold to consider answer close to the search term
+
     for page_number in range(len(pdf_document)):
         page = pdf_document[page_number]
         rects_search_term = page.search_for(search_sentence)
         rects_answer = page.search_for(answer)
-        
-        
-        if rects_search_term and rects_answer:
-            for rect_search in rects_search_term:
-                for rect_answer in rects_answer:
-                    if abs(rect_search.y0 - rect_answer.y0) <= proximity_threshold:
-                        highlight = page.add_highlight_annot(rect_answer)
-                        
-        ## If the search term is not found, highlight the answer ##
-        if rects_search_term:  
-            combined_rect = fitz.Rect(rects_search_term[0].top_left, rects_search_term[-1].bottom_right)
-            combined_rect.y0 -= 50
-            combined_rect.y1 += 50
-            combined_rect.x0 = 0
-            combined_rect.x1 = page.rect.width
+        highlighted_rects = []
+
+        # Highlight only if answer is in proximity to the search sentence
+        for rect_search in rects_search_term:
+            for rect_answer in rects_answer:
+                if abs(rect_search.y0 - rect_answer.y0) <= proximity_threshold:
+                    page.add_highlight_annot(rect_answer)
+                    highlighted_rects.append(rect_answer)
+                    break  # Break to avoid highlighting multiple instances
+
+        # Determine the area to capture based on highlighted sections
+        if highlighted_rects:
+            combined_rect = fitz.Rect(page.rect.x0, page.rect.y1, page.rect.x1, page.rect.y0)
+
+            for rect in highlighted_rects:
+                combined_rect.y0 = min(combined_rect.y0, rect.y0 - vertical_padding)
+                combined_rect.y1 = max(combined_rect.y1, rect.y1 + vertical_padding)
+
             mat = fitz.Matrix(4.0, 4.0)
             pix = page.get_pixmap(clip=combined_rect, matrix=mat, dpi=300)
             img = Image.frombytes("RGB", [pix.width, pix.height], pix.samples)
             images.append((img, page_number + 1))
 
     pdf_document.close()
-    return images    
+    return images

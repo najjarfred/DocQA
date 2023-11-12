@@ -1,7 +1,7 @@
 /* Existing CSS from style.css */
 body {
     color: #ffffff;
-    font-family: 'Arial', sans serif; 
+    font-family: 'Arial', sans-serif; 
 }
 
 #custom-container {
@@ -40,8 +40,8 @@ body .stApp .stSidebar {
 .logo-image {
     max-width: 225px;
     position: absolute;
-    bottom: -120px;
-    left: 5%;
+    bottom: 0px;
+    left: 0%;
 }
 
 label {
@@ -53,14 +53,14 @@ input[type="radio"] + label {
 }
 
 .original-title {
-    font-family: sans serif;
+    font-family: sans-serif;
     color: #ffffff;
     font-size: 24px;
     font-weight: bold;
 }
 
 .credit-text {
-    font-family: sans serif;
+    font-family: sans-serif;
     color: #F5DFDF;
     font-size: 10px;
     text-align: left;

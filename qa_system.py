@@ -30,14 +30,19 @@ def get_answer(context, question, selected_model):
     return None
 
 #### Display Results Function ####
-def display_results(top_answer, question):
+def display_results(top_answer, question, confidence=None):
     st.subheader(question)
     answer = top_answer['answer']
     if answer.strip():
-        answer_text = answer
-        st.success(answer_text)
+        st.success(answer)
     else:
-        answer_text = f'The answer to the question "{question}" cannot be found in the given text.'
-        st.error(answer_text)
-    confidence_score = f"Confidence: {top_answer['score']*100:.0f}%"
-    st.text(confidence_score)
+        st.error(f'The answer to the question "{question}" cannot be found in the given text.')
+
+    if confidence is not None:
+        
+        st.text(f"Confidence: {confidence * 100:.0f}%")
+        
+
+
+
+

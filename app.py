@@ -5,6 +5,7 @@ import io
 import time   
 import base64
 from PIL import Image
+import pandas as pd
 
 ###### Setup UI Function ######
 def setup_ui():
@@ -22,7 +23,7 @@ def main():
         st.session_state['uploaded_file_path'] = None
         
     if 'tab' not in st.session_state:
-        st.session_state.tab = "SELECT"
+        st.session_state.tab = "UPLOAD"
 
     ###### Setup UI ######
     setup_ui()
@@ -52,10 +53,10 @@ def main():
         st.markdown(sub_text, unsafe_allow_html=True)
         
         model_dict = {
+            "BigBird RoBERTa Base": "FredNajjar/bigbird-QA-squad_v2.2",
             "DeBERTa-V3 Large": "deepset/deberta-v3-large-squad2",
             "RoBERTa Base": "deepset/roberta-base-squad2",
             "ALBERT-V2 Base": "squirro/albert-base-v2-squad_v2",
-            "BigBird RoBERTa Base": "FredNajjar/bigbird-QA-squad_v2.2"
         }
 
         ###### Model Selection ######
@@ -72,7 +73,7 @@ def main():
         st.markdown(sub_text, unsafe_allow_html=True)
         tab = st.radio(
             label="Upload or select your PDF file",
-            options=['SELECT', 'UPLOAD'],
+            options=['UPLOAD', 'SELECT'],
             key="tab",
             index=0,
             help="Select or Upload a Document for processing.")
@@ -102,49 +103,88 @@ def main():
         
     ###### Question Input ######
     tab_1, tab_2 = st.tabs(["ASK", "SELECT"]) 
+    
     with tab_1:
         question = st.text_input(label=" ", 
                                  placeholder="Type your question here...")
 
     with tab_2:
-        questions = get_question_list(st.session_state.uploaded_file_path)
-        if questions:
-            question = st.selectbox(label=" ", 
-                                    options=questions, 
-                                    index=0, 
-                                    key="question_selection")
+        reverse_model_dict = {v: k for k, v in model_dict.items()}
+        selected_model_name = reverse_model_dict.get(selected_model, selected_model)
+        question_records = get_question_list(st.session_state.uploaded_file_path, selected_model_name)
+        if question_records:
+            selected_record = st.selectbox(
+                label="Select a question",
+                options=question_records,
+                format_func=lambda record: record["Question"],
+                index=0,
+                key="question_selection"
+            )
+            # Access record elements as dictionary keys
+            question = selected_record["Question"]
+            gold_answer = selected_record["Gold Answer"]
+            selected_model = selected_record["Model Name"] 
+            confidence = selected_record["Confidence"]
+            time_taken = selected_record["Time"]
+            search_sentence = selected_record["Search Sentence"]
+            # Check if the gold answer is not nan or empty
+            if not pd.notna(gold_answer) or not gold_answer.strip():
+                st.error(f"The answer to the question \"{question}\" cannot be found in the given document.")
+                return  # Stop further execution for this tab
+
         else:
             st.error("There are no questions ready for this document.")
-    
+
     ###### Question Answering System ######
+
     if st.button(label="Submit", type="primary"):
         if not st.session_state.context:
             st.warning("Upload a document first...")
         elif not question:
             st.warning("Ask a question first...")
         else:
-            start_time = time.time()  
+            start_time = time.time()
+            if st.session_state.tab == "SELECT":
+                mock_answer = {
+                    'answer': gold_answer
+                }
+                display_results(mock_answer, question, confidence=confidence)
+                search_term = search_sentence  # Use the 'Search Sentence' from the selected record
 
-            with st.spinner("Processing..."):
-                result = get_answer(st.session_state.context, question, selected_model)
-                if result:
-                    original_answer, search_term = result  
-                    display_results(original_answer, question)
-                    if st.session_state.uploaded_file_path:
-                        with st.expander("Click to Unreveal Evidence"):  
-                            images = get_highlighted_image(st.session_state.uploaded_file_path, search_term, original_answer['answer'].strip())
-                            for img, page_number in images:
-                                img_byte_arr = io.BytesIO()
-                                img.save(img_byte_arr, format='PNG')
-                                st.image(img_byte_arr.getvalue(), caption=f'Highlighted Page (Page {page_number})', use_column_width=True)
-                else:
-                    answer_text = f'The answer to the question "{question}" cannot be found in the given document.'
-                    st.error(answer_text)
+            else:
+                with st.spinner("Processing..."):
+                    result = get_answer(st.session_state.context, question, selected_model)
+                    if result:
+                        original_answer, search_term = result
+                        display_results(original_answer, question)
+                        mock_answer = original_answer  # Use the original answer for highlighting
+                    else:
+                        st.error(f"The answer to the question \"{question}\" cannot be found in the given document.")
+                        return
+    
+            # Highlighting in the PDF
+            if st.session_state.uploaded_file_path:
+                with st.expander("Click to Unreveal Evidence"):
+                    search_term_str = str(search_term) if search_term else ""
+                    images = get_highlighted_image(st.session_state.uploaded_file_path, search_term_str, mock_answer['answer'].strip())
+                    for img, page_number in images:
+                        img_byte_arr = io.BytesIO()
+                        img.save(img_byte_arr, format='PNG')
+                        st.image(img_byte_arr.getvalue(), caption=f'Highlighted Page (Page {page_number})', use_column_width=True)
 
             end_time = time.time()  
             processing_time = end_time - start_time  
 
-            if processing_time > 60:
+
+            
+            if time_taken:
+                if time_taken > 60:
+                    processing_time_minutes = time_taken / 60
+                    st.markdown(f"<small class='processing-time'>Query processed in {processing_time_minutes:.2f} mins</small>", unsafe_allow_html=True)
+                else:
+                    st.markdown(f"<small class='processing-time'>Query processed in {time_taken:.2f} secs</small>", unsafe_allow_html=True)
+                    
+            elif processing_time > 60:
                 processing_time_minutes = processing_time / 60
                 st.markdown(f"<small class='processing-time'>Query processed in {processing_time_minutes:.2f} mins</small>", unsafe_allow_html=True)
             else:
