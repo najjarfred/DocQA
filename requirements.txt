@@ -1,0 +1,7 @@
+streamlit
+transformers
+PyPDF2
+pandas
+Pillow
+PyMuPDF
+torch
