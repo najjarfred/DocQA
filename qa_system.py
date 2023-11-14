@@ -7,8 +7,6 @@ from sentence_transformers import SentenceTransformer
 # Initialize Pinecone
 pinecone.init(api_key='151b3936-4da3-436a-958f-0cb1ef32fbe3', environment='gcp-starter') 
 index = pinecone.Index("qa-index")
-
-# Load a pre-trained sentence transformer model for vectorization
 vectorizer = SentenceTransformer('all-MiniLM-L6-v2')
 
 ###### Get Answer Function ######
