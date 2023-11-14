@@ -144,6 +144,7 @@ def main():
             st.warning("Ask a question first...")
         else:
             start_time = time.time()
+            time_taken = None 
             if st.session_state.tab == "SELECT":
                 mock_answer = {
                     'answer': gold_answer
