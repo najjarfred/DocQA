@@ -1,5 +1,6 @@
 streamlit
 transformers
+pinecone
 PyPDF2
 pandas
 Pillow
