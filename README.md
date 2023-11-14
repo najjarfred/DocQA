@@ -26,7 +26,7 @@
     pip install -r requirements.txt
     ```
 
-    This will install Streamlit, PyPDF2, Pandas, and other necessary libraries.
+    This will install Transfomers, Pinecone, Streamlit, PyPDF2, Pandas, and other necessary libraries.
 
  # Usage
 
