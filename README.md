@@ -11,7 +11,7 @@
 
 # Demo
 
-A demo of the system functionalities can be found [here](https://www.youtube.com/watch?v=E1wZno7TTo8&t=3s&ab_channel=FredNajjar)
+A demo of the system functionalities can be found [here](https://www.youtube.com/watch?v=E1wZno7TTo8&ab_channel=FredNajjar)
 
  # Installation
 
