@@ -2,26 +2,27 @@ import streamlit as st
 from document_uploader import upload_or_select_document, displayPDF, get_highlighted_image, get_question_list
 from qa_system import get_answer, display_results
 import io
-import time   
+import time
 import base64
 from PIL import Image
 import pandas as pd
+import re
 
 ###### Setup UI Function ######
 def setup_ui():
     st.set_page_config(page_title="Capstone DATA5709 - Doc QA",
                        page_icon="logo.ico")
-   
+
 ###### Main Function ######
 def main():
 
     ###### Session State ######
     if 'context' not in st.session_state:
         st.session_state.context = ""
-        
+
     if 'uploaded_file_path' not in st.session_state:
         st.session_state['uploaded_file_path'] = None
-        
+
     if 'tab' not in st.session_state:
         st.session_state.tab = "UPLOAD"
 
@@ -31,8 +32,8 @@ def main():
     ###### Read CSS ######
     with open("style.css") as f:
         st.markdown(f"<style>{f.read()}</style>", unsafe_allow_html=True)
-    
-    ###### Sidebar ######       
+
+    ###### Sidebar ######
     with st.sidebar:
         st.markdown(
             '<p class="original-title">Document Question Answering</p>', 
@@ -51,37 +52,30 @@ def main():
         
         sub_text = '<p class="section-title">1- Select a Model</p>'
         st.markdown(sub_text, unsafe_allow_html=True)
-        
-        model_dict = {
-            "BigBird RoBERTa Base": "FredNajjar/bigbird-QA-squad_v2.2",
-            "DeBERTa-V3 Large": "deepset/deberta-v3-large-squad2",
-            "RoBERTa Base": "deepset/roberta-base-squad2",
-            "ALBERT-V2 Base": "squirro/albert-base-v2-squad_v2",
-        }
 
         ###### Model Selection ######
-        selected_model_name = st.sidebar.selectbox(
-            label="Select a Model",
-            options=list(model_dict.keys()),
-            index=0,  
-            key="model_selection", 
-            help="Select a model for question answering.")
-        selected_model = model_dict[selected_model_name]
+        selected_model = st.sidebar.text_input(
+            label="Enter a Model Name",
+            value="FredNajjar/bigbird-QA-squad_v2.2",  # Default value
+            key="model_selection",
+            help="You can enter any QA model from Hugging Face hub"
+        )
 
-        ###### Upload or Select Document ######
-        sub_text = '<p class="section-title">2- Upload or select your PDF file</p>'
+        if not selected_model:
+            st.sidebar.error("Invalid model name. Try another QA model.")
+        
+        st.markdown("", unsafe_allow_html=True)
+        
+        ###### Upload a Document ######
+        sub_text = '<p class="section-title">2- Upload your PDF file</p>'
         st.markdown(sub_text, unsafe_allow_html=True)
-        tab = st.radio(
-            label="Upload or select your PDF file",
-            options=['UPLOAD', 'SELECT'],
-            key="tab",
-            index=0,
-            help="Select or Upload a Document for processing.")
-        new_context, uploaded_file_path = upload_or_select_document(tab)
+
+        new_context, uploaded_file_path = upload_or_select_document('UPLOAD')
         if new_context:
             st.session_state.context = new_context
         if uploaded_file_path:
             st.session_state.uploaded_file_path = uploaded_file_path
+
 
         ###### Logo ######
         with open("logo.png", "rb") as f:
@@ -96,103 +90,62 @@ def main():
             ''',
             unsafe_allow_html=True)
 
-    ###### Main Area ######       
+    ###### Main Area ######
     if st.session_state.uploaded_file_path:
         displayPDF(st.session_state.uploaded_file_path)
-        
-        
+
     ###### Question Input ######
-    tab_1, tab_2 = st.tabs(["ASK", "SELECT"]) 
-    
-    with tab_1:
-        question = st.text_input(label=" ", 
-                                 placeholder="Type your question here...")
-
-    with tab_2:
-        reverse_model_dict = {v: k for k, v in model_dict.items()}
-        selected_model_name = reverse_model_dict.get(selected_model, selected_model)
-        question_records = get_question_list(st.session_state.uploaded_file_path, selected_model_name)
-        if question_records:
-            selected_record = st.selectbox(
-                label="Select a question",
-                options=question_records,
-                format_func=lambda record: record["Question"],
-                index=0,
-                key="question_selection"
-            )
-            # Access record elements as dictionary keys
-            question = selected_record["Question"]
-            gold_answer = selected_record["Gold Answer"]
-            selected_model = selected_record["Model Name"] 
-            confidence = selected_record["Confidence"]
-            time_taken = selected_record["Time"]
-            search_sentence = selected_record["Search Sentence"]
-            # Check if the gold answer is not nan or empty
-            if not pd.notna(gold_answer) or not gold_answer.strip():
-                st.error(f"The answer to the question \"{question}\" cannot be found in the given document.")
-                return  # Stop further execution for this tab
-
-        else:
-            st.error("There are no questions ready for this document.")
+    question = st.text_input(label=" ", 
+                             placeholder="Type your question here...")
 
     ###### Question Answering System ######
 
     if st.button(label="Submit", type="primary"):
-        if not st.session_state.context:
+        if not selected_model:
+            st.error("Please type in a model name first...")
+        elif not st.session_state.context:
             st.warning("Upload a document first...")
         elif not question:
             st.warning("Ask a question first...")
         else:
-            start_time = time.time()
-            time_taken = None 
-            if st.session_state.tab == "SELECT":
-                mock_answer = {
-                    'answer': gold_answer
-                }
-                display_results(mock_answer, question, confidence=confidence)
-                search_term = search_sentence  # Use the 'Search Sentence' from the selected record
-
-            else:
+            try: 
+                start_time = time.time()
                 with st.spinner("Processing..."):
                     result = get_answer(st.session_state.context, question, selected_model)
                     if result:
                         original_answer, search_term = result
                         display_results(original_answer, question)
-                        mock_answer = original_answer  # Use the original answer for highlighting
                     else:
                         st.error(f"The answer to the question \"{question}\" cannot be found in the given document.")
                         return
-    
-            # Highlighting in the PDF
-            if st.session_state.uploaded_file_path:
-                with st.expander("Click to Unreveal Evidence"):
-                    search_term_str = str(search_term) if search_term else ""
-                    images = get_highlighted_image(st.session_state.uploaded_file_path, search_term_str, mock_answer['answer'].strip())
-                    for img, page_number in images:
-                        img_byte_arr = io.BytesIO()
-                        img.save(img_byte_arr, format='PNG')
-                        st.image(img_byte_arr.getvalue(), caption=f'Highlighted Page (Page {page_number})', use_column_width=True)
 
-            end_time = time.time()  
-            processing_time = end_time - start_time  
+                # Highlighting in the PDF
+                if st.session_state.uploaded_file_path:
+                    with st.expander("Click to Unreveal Evidence"):
+                        search_term_str = str(search_term) if search_term else ""
+                        images = get_highlighted_image(st.session_state.uploaded_file_path, search_term_str, original_answer['answer'].strip())
+                        for img, page_number in images:
+                            img_byte_arr = io.BytesIO()
+                            img.save(img_byte_arr, format='PNG')
+                            st.image(img_byte_arr.getvalue(), caption=f'Highlighted Page (Page {page_number})', use_column_width=True)
 
+                end_time = time.time()  
+                processing_time = end_time - start_time
 
-            
-            if time_taken:
-                if time_taken > 60:
-                    processing_time_minutes = time_taken / 60
+                if processing_time > 60:
+                    processing_time_minutes = processing_time / 60
                     st.markdown(f"<small class='processing-time'>Query processed in {processing_time_minutes:.2f} mins</small>", unsafe_allow_html=True)
                 else:
-                    st.markdown(f"<small class='processing-time'>Query processed in {time_taken:.2f} secs</small>", unsafe_allow_html=True)
-                    
-            elif processing_time > 60:
-                processing_time_minutes = processing_time / 60
-                st.markdown(f"<small class='processing-time'>Query processed in {processing_time_minutes:.2f} mins</small>", unsafe_allow_html=True)
-            else:
-                st.markdown(f"<small class='processing-time'>Query processed in {processing_time:.2f} secs</small>", unsafe_allow_html=True)
+                    st.markdown(f"<small class='processing-time'>Query processed in {processing_time:.2f} secs</small>", unsafe_allow_html=True)
 
+            except ValueError as ve:
+                st.error(f'The model "{selected_model}" is not compatible. Try another model.')
+            except OSError as oe:
+                st.error(f"Error with the model: {selected_model}. Make sure it's a valid model identifier or try another model.")
+            except Exception as e:
+                # General catch-all for other unforeseen errors
+                st.error(f'An error occurred when loading "{selected_model}". Please Try another model.')
 
 
 if __name__ == "__main__":
     main()
-
