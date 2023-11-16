@@ -3,11 +3,15 @@
  DocQA is an interactive web application built using Streamlit, designed to provide question-answering capabilities on uploaded documents. It utilizes pre-trained language models from Hugging Face's Transformers library to extract answers from PDF documents.
 
  # Features
-
+ 
+ - **Model Selection**: Allows to copy any Extractive QA model from Hugging Face [link](https://huggingface.co/models?pipeline_tag=question-answering&sort=trending).
  - **Document Upload**: Users can upload PDF documents to the system.
- - **Model Selection**: Allows the choice of different pre-trained question-answering models.
  - **Interactive Q&A**: Users can ask questions and receive answers based on the content of the uploaded document.
  - **Highlighted Answers**: The application highlights answers directly in the uploaded document for better context.
+
+# Demo
+
+A demo of the system functionalities can be found [here](https://www.youtube.com/watch?v=E1wZno7TTo8&t=3s&ab_channel=FredNajjar)
 
  # Installation
 
