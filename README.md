@@ -11,7 +11,7 @@
  - **Interactive Q&A**: Users can ask questions and receive answers based on the content of the uploaded document.
  - **Highlighted Answers**: The application highlights answers directly in the uploaded document for better context.
 
-# Demo
+# Demo 🎬
 
 A demo of the system functionalities can be found [here](https://www.youtube.com/watch?v=E1wZno7TTo8&ab_channel=FredNajjar)
 
